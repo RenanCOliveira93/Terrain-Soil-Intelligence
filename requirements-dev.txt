@@ -1,0 +1,8 @@
+-r backend/requirements.txt
+pytest
+pymupdf
+playwright
+jupyter
+nbclient
+nbformat
+ipykernel

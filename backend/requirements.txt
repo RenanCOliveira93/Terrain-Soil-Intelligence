@@ -1,0 +1,21 @@
+# Dependências diretas (versões testadas em requirements.lock.txt na raiz do projeto)
+fastapi
+uvicorn[standard]
+geopandas
+shapely
+rasterio
+rasterstats
+pyproj
+numpy
+scipy
+pydantic-settings
+python-multipart
+sqlalchemy
+geoalchemy2
+psycopg2-binary
+reportlab
+matplotlib
+contourpy
+pillow
+lxml
+httpx
