@@ -1,75 +1,84 @@
-# Project 03 · Terrain & Soil Intelligence
+# Terrain & Soil Intelligence
 
-[🇧🇷 Português](README.md) · 🇺🇸 English
+[Português](README.md) · [English](README.en.md)
 
-A web platform for **terrain and soil analysis of agricultural properties**: draw or import a boundary (GeoJSON, KML, zipped Shapefile) and get area, perimeter, elevation, slope, aspect, hypsometry, contour lines and estimated soil attributes, with interactive maps, plot comparison, GeoTIFF/GeoJSON export and a **PDF report that includes methodology, sources and limitations**.
-
-**Stack:** FastAPI · Shapely · GeoPandas · Rasterio · rasterstats · PostGIS (SQLite in demo) · React + TypeScript · MapLibre GL JS · Docker Compose · pytest · Playwright.
+A web platform for terrain and soil analysis of agricultural properties: from a drawn or imported boundary (GeoJSON, KML, zipped Shapefile) it computes area, perimeter, elevation, slope, aspect, hypsometry, contour lines and estimated soil attributes, with interactive maps, plot comparison, GeoTIFF/GeoJSON export and a PDF report covering methodology, sources and limitations.
 
 ![Slope and indicators](docs/screenshots/02_declividade_e_indicadores.png)
 
-> ### ⚠️ Read before use
-> - **Copernicus DEM GLO-30 is a DSM** (a *surface* model that includes canopy and buildings) with **~30 m** cells. It is **not a topographic survey**: it cannot map micro-relief or be used to plan safe sprayer/machinery paths.
-> - Contour lines are **interpolated** from the DSM, **not** field measurements.
-> - **SoilGrids** is a **model prediction** at 250 m with very wide 90% intervals (in the demo, clay 37.8% **[5.8–79.9]**), so the app does not claim soil differences between plots.
-> - The app does **not estimate** compaction, actual fertility, fertiliser requirements, traffic safety or rollover risk: these need field data and expert validation.
-> - Demo-mode polygons are **fictitious** (drawn over real data).
+## Features
 
-> The UI, notebooks and `docs/pt-BR/` are in Portuguese; this README summarises the project.
+- Polygon drawing, editing and import, with geometry and CRS validation (repair with warning, rejection of UTM coordinates in GeoJSON, overlapping-plot detection).
+- Area, perimeter, centroid and bounding box in SIRGAS 2000 / UTM, cross-checked geodesically on the ellipsoid.
+- Copernicus DEM GLO-30 clipped to the polygon: elevation, slope (Horn gradient), aspect, hypsometry and contours with an interval policy consistent with the resolution.
+- SoilGrids 2.0 (pH, organic carbon, clay, silt, sand) with a per-pixel 90% prediction interval.
+- Zonal statistics per property and plot, with quality warnings (few pixels, plot smaller than a pixel).
+- Asynchronous jobs with progress; offline demo mode using versioned real clips.
+- GeoTIFF (DEM, slope, aspect), GeoJSON and PDF report export.
 
-## Delivered and verified
-| Requirement | Status |
-|---|---|
-| Draw, edit, import polygons (GeoJSON, KML, zipped Shapefile) | ✅ unit + E2E tests (real mouse drawing) |
-| Validate geometry, CRS, intersections, invalid polygons | ✅ repair with warning, UTM-in-GeoJSON rejected, overlapping/outside plots |
-| Area (ha), perimeter, centroid, bbox in a suitable projection | ✅ SIRGAS 2000/UTM + geodesic cross-check (332.86 vs 332.85 ha) |
-| Copernicus GLO-30 DEM, clipped to the polygon | ✅ live (AWS COG) and offline sample; identical |
-| Elevation, slope, aspect, hypsometry, contours coherent with resolution | ✅ validated on analytic surfaces (0.002% error); interval < 5 m rejected |
-| SoilGrids (pH, carbon, clay, silt, sand), documented depth/units | ✅ with per-pixel 90% interval; failure isolated if the source is down |
-| Interactive maps, layers, legend, scale, charts, per-plot statistics | ✅ screenshots in `docs/screenshots/` |
-| Export GeoTIFF/GeoJSON and PDF with methodology, sources, limitations | ✅ tested |
-| PostGIS storage | ⚠️ **code written, NOT executed** (no Docker here); SQLite tested |
-| Async jobs with progress | ✅ monotonic progress tested |
-| Offline demo mode | ✅ **real** clips versioned (≈ 860 KB) |
-| Docker Compose | ⚠️ **syntax validated, NOT executed** |
+## Usage notes
 
-## Quick start (offline demo)
-```bash
-make install && cp .env.example .env     # TSI_MODE=demo
-make api      # http://localhost:8000/docs
-make web      # http://localhost:5173
+- Copernicus DEM GLO-30 is a DSM (includes canopy and buildings) with ~30 m cells. It is not a topographic survey and must not be used to plan machinery paths.
+- Contour lines are interpolated from the DSM, not field measurements.
+- SoilGrids is a model prediction at 250 m with wide intervals (demo: clay 37.8% [5.8–79.9]); the application does not claim soil differences between plots.
+- The application does not estimate compaction, fertility, fertiliser requirements, traffic safety or rollover risk.
+- Demo-mode polygons are fictitious (drawn over real data).
+
+## Architecture
+
 ```
-Pick **Fazenda Demo (ilustrativa)** → **▶ Executar análise**. For **live** mode (anywhere in Brazil, needs internet) set `TSI_MODE=live`. Docker: `docker compose up --build` (untested, see above).
+Frontend (React + TypeScript + MapLibre GL JS)
+   └─ /api ─ FastAPI backend ─ PostGIS (SQLite in demo mode)
+                └─ Async jobs ─ Geospatial core (Shapely, GeoPandas, Rasterio, rasterstats)
+                                 ├─ Copernicus DEM GLO-30 (COG, AWS Open Data)
+                                 ├─ SoilGrids 2.0 (ISRIC)
+                                 └─ sample_data/ (offline demo mode)
+```
 
-## Demo results (real data, fictitious polygon)
-A **332.86 ha** property near Espírito Santo do Pinhal (SP, Brazil): DSM elevation **794–874 m** (mean 834), mean slope **11.5%** (P95 22.8%), 60.6% of the area in the *Ondulado* class (8–20%), dominant aspect East with every orientation present. Soil (0–5 cm): clay **37.8% [5.8–79.9]**, pH **5.3 [4.3–6.7]**, organic carbon **29.5 g/kg [5.3–73.6]**. Plot comparison: every soil difference is **within the uncertainty**.
+## Quick start (offline demo mode)
 
-## Key methodological findings
-- **Resolution dominates** slope: aggregating the real DEM from 30 m to 150 m drops mean slope from 14.2% to 8.7% (notebook 01).
-- Spatial variation of the predicted soil mean inside the property is ≈ **3.6%** of the 90% interval width (median, notebook 03): soil maps show model structure, not measured differences.
-- ISRIC's `uncertainty` layer ≈ 10 × (Q0.95 − Q0.05)/Q0.50 (r = 0.955, 68 pixels). The official docs were down, so the definition is unconfirmed and the app uses the quantiles directly.
+Requires Python 3.11 and Node.js.
 
-## Source and dependency status (2026-10-31)
-| Item | Status |
-|---|---|
-| Copernicus DEM (AWS) | ✅ working |
-| SoilGrids COG (`files.isric.org`) | ✅ working |
-| SoilGrids REST (`rest.isric.org`) | ❌ 503 — not used |
-| ISRIC docs (`docs.isric.org`) | ❌ 502 — units and `uncertainty` verified from the data |
-| DEM datum/accuracy | ⚠️ secondary sources (Handbook only as table of contents) |
-| PostGIS, Docker Compose | ⚠️ not executed |
+```bash
+make install                 # venv + Python dependencies + npm install
+cp .env.example .env         # TSI_MODE=demo
+make api                     # terminal 1: http://localhost:8000/docs
+make web                     # terminal 2: http://localhost:5173
+```
+
+Select **Fazenda Demo (ilustrativa)** and run the analysis. For real data anywhere in Brazil (internet required) set `TSI_MODE=live`. Docker Compose (PostGIS) is described in the [technical guide](docs/GUIA_TECNICO.md#45-docker-compose-postgis).
+
+## Repository layout
+
+```
+backend/app/      FastAPI API and geospatial core (core/)
+frontend/src/     React + TypeScript + MapLibre
+infra/            Dockerfiles, nginx, init.sql
+tests/            unit, API and e2e/ (Playwright)
+sample_data/      real clips (DEM, SoilGrids), fictitious polygons and invalid test files
+notebooks/        terrain, real-DEM and SoilGrids-uncertainty validation
+scripts/          sample data, notebooks, OpenAPI, infrastructure check
+docs/             GUIA_TECNICO.md, openapi.json, screenshots/
+```
 
 ## Tests
-`pytest tests -q` → **63 passed** · with network **65** · E2E (Chromium) **13** · frontend **5** · 3 executed notebooks. **Not validated:** DEM accuracy against ground truth, PostGIS (see `docs/pt-BR/12_testes_e_validacao.md`).
 
-## Licences
-Code: **GPL-3.0** (see `LICENSE`). Data: Copernicus DEM (Copernicus licence, cite the source) and SoilGrids (CC BY 4.0). Redistribution terms of the Copernicus clips were **not legally reviewed** — see [sample_data/ATTRIBUTION.md](sample_data/ATTRIBUTION.md).
+```bash
+make test        # pytest + frontend typecheck and tests
+make test-net    # tests that reach the remote sources
+make e2e         # UI tests (Playwright/Chromium)
+```
 
-## Repository, versioning and running on another machine
+Scope, reference results and items outside validation (DEM accuracy against ground truth, PostGIS) are in section 8 of the [technical guide](docs/GUIA_TECNICO.md#8-testes-e-validação).
 
-Published from the original development machine (macOS, Podman). This has **not** been run on GitHub Codespaces or Docker Desktop; if you run it there, treat it as a first verification and compare with the tests section.
+## Data and licences
 
-- **Versioned:** `backend/`, `frontend/`, `scripts/`, notebooks, tests, `docs/pt-BR/` and `sample_data/` (demo clips; attribution in `sample_data/ATTRIBUTION.md`). `demo` mode (default in `.env.example`) reads only `sample_data/` and runs offline.
-- **Not versioned:** `data/` (live-mode download cache and the runtime SQLite), `.env`, `node_modules/`.
-- **Not validated:** `docker-compose.yml` and PostGIS were written but **never executed** on the dev machine (see the warning at the top); DEM accuracy was not checked against GNSS.
-- **Code licence:** GPL-3.0 (`LICENSE`). Third-party data/model licences and attributions: see the sections and docs above.
+Data: Copernicus DEM (Copernicus licence, cite the source) and SoilGrids (CC BY 4.0). Redistribution terms of the Copernicus clips were not legally reviewed; see [sample_data/ATTRIBUTION.md](sample_data/ATTRIBUTION.md).
+
+## Documentation
+
+[Technical guide](docs/GUIA_TECNICO.md) (in Portuguese): architecture, data sources, installation and reproduction, methodology, API, tests, limitations and licences. OpenAPI schema in [docs/openapi.json](docs/openapi.json).
+
+## Licence
+
+Code under GPL-3.0 ([LICENSE](LICENSE)).

@@ -41,14 +41,14 @@ for k, g in [("Fazenda Demo (ilustrativa)", prop)] + list(plots.items()):
         pm.append(f"<Placemark><name>{k}</name><Polygon><outerBoundaryIs><LinearRing><coordinates>{ring(poly.exterior)}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>")
 (OUT / "propriedade_demo.kml").write_text('<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>' + "".join(pm) + "</Document></kml>", encoding="utf-8")
 
-# Shapefile em SIRGAS 2000 / UTM 23S (EPSG:31983) para exercitar a reprojeção a partir do .prj
+# Shapefile em SIRGAS 2000 / UTM 23S (EPSG:31983) para testar a reprojeção a partir do .prj
 gdf = gpd.GeoDataFrame({"nome": ["Fazenda Demo (ilustrativa)"] + list(plots), "tipo": ["property"] + ["plot"] * len(plots)},
                        geometry=[prop] + list(plots.values()), crs=4326).to_crs(31983)
 with tempfile.TemporaryDirectory() as td:
     gdf.to_file(Path(td) / "propriedade_demo.shp")
     shutil.make_archive(str(OUT / "propriedade_demo_shp"), "zip", td)
 
-# Casos inválidos (usados em testes e tutorial)
+# Casos inválidos (usados em testes)
 bow = Polygon([(-46.79, -22.20), (-46.78, -22.19), (-46.78, -22.20), (-46.79, -22.19)])
 (OUT / "invalido_gravata.geojson").write_text(json.dumps(fc([feat("gravata (auto-interseção)", bow)])), encoding="utf-8")
 utm = gdf.iloc[[0]]
